@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:api.synthesis.trade)",
+      "WebFetch(domain:docs.synthesis.trade)",
+      "WebFetch(domain:synthesis.trade)"
+    ]
+  }
+}
