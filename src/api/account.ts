@@ -1,17 +1,18 @@
 import type { SynthesisClient } from './client.js';
+import type { AccountSession, ApiKeyInfo } from '../types/index.js';
 
 // ─── Account (X-API-KEY) ──────────────────────────────────────────────────────
 
 // GET /api/v1/account/session
-export async function getSession(client: SynthesisClient): Promise<{ authenticated: boolean }> {
+export async function getSession(client: SynthesisClient): Promise<AccountSession> {
   client.requireAuth();
-  return client.get<{ authenticated: boolean }>('account/session');
+  return client.get<AccountSession>('account/session');
 }
 
 // GET /api/v1/account/api-key
-export async function getApiKeys(client: SynthesisClient): Promise<unknown[]> {
+export async function getApiKeys(client: SynthesisClient): Promise<ApiKeyInfo[]> {
   client.requireAuth();
-  return client.get<unknown[]>('account/api-key');
+  return client.get<ApiKeyInfo[]>('account/api-key');
 }
 
 // GET /api/v1/account/interests

@@ -1,17 +1,18 @@
 import type { SynthesisClient } from './client.js';
+import type { Wallet } from '../types/index.js';
 
 // All wallet endpoints use X-API-KEY header
 
 // GET /api/v1/wallet — auto-creates first wallet if none exist
-export async function getWallets(client: SynthesisClient): Promise<unknown[]> {
+export async function getWallets(client: SynthesisClient): Promise<Wallet[]> {
   client.requireAuth();
-  return client.get<unknown[]>('wallet');
+  return client.get<Wallet[]>('wallet');
 }
 
 // POST /api/v1/wallet
-export async function createWallet(client: SynthesisClient): Promise<unknown> {
+export async function createWallet(client: SynthesisClient): Promise<Wallet> {
   client.requireAuth();
-  return client.post<unknown>('wallet', {});
+  return client.post<Wallet>('wallet', {});
 }
 
 // PUT /api/v1/wallet — reorder by position
@@ -28,9 +29,9 @@ export async function updateWallet(
   client: SynthesisClient,
   walletId: string,
   updates: { name?: string; autoredeem?: boolean }
-): Promise<unknown> {
+): Promise<Wallet> {
   client.requireAuth();
-  return client.put<unknown>(`wallet/${walletId}`, updates);
+  return client.put<Wallet>(`wallet/${walletId}`, updates);
 }
 
 // DELETE /api/v1/wallet/{wallet_id}

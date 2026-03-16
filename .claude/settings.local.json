@@ -3,7 +3,25 @@
     "allow": [
       "WebFetch(domain:api.synthesis.trade)",
       "WebFetch(domain:docs.synthesis.trade)",
-      "WebFetch(domain:synthesis.trade)"
+      "WebFetch(domain:synthesis.trade)",
+      "Bash(gemini-api.sh:*)",
+      "Bash(qwen:*)",
+      "mcp__consult7__consultation",
+      "Bash(curl:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm test:*)",
+      "Bash(node -e:*)",
+      "WebSearch",
+      "mcp__synthesis__list_markets",
+      "mcp__synthesis__search_markets",
+      "mcp__synthesis__get_market_statistics",
+      "mcp__synthesis__get_news",
+      "mcp__synthesis__list_polymarket_markets"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "synthesis"
+  ]
 }

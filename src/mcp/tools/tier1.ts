@@ -5,8 +5,8 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SynthesisClient } from '../../api/client.js';
 import {
-  listMarkets, searchMarkets, getSparklines, getMarketPrices,
-  getOrderbooks, getHistoricalOrderbooks, getStatistics,
+  listMarkets, searchMarkets,
+  getHistoricalOrderbooks, getStatistics,
   getRelatedMarkets, getSimilarMarkets, getSimilarPairs,
 } from '../../api/markets.js';
 import {
@@ -20,6 +20,7 @@ import {
   getKalshiLeaderboard, getKalshiUser,
 } from '../../api/kalshi.js';
 import { getNews, getEventNews, getMarketNews } from '../../api/news.js';
+import { summarize } from '../../utils/trim.js';
 
 export function registerTier1Tools(server: McpServer, client: SynthesisClient): void {
 
@@ -42,7 +43,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const markets = await listMarkets(client, params);
-      return { content: [{ type: 'text', text: JSON.stringify({ count: markets.length, markets }, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(markets) }] };
     }
   );
 
@@ -63,43 +64,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async ({ query, ...params }) => {
       const results = await searchMarkets(client, query, params);
-      return { content: [{ type: 'text', text: JSON.stringify({ query, count: results.length, results }, null, 2) }] };
-    }
-  );
-
-  // ── get_market_prices ───────────────────────────────────────────────────────
-  server.tool('get_market_prices',
-    'Get current prices for multiple markets in one request. Pass Polymarket token IDs or Kalshi market IDs (up to 5000).',
-    {
-      markets: z.array(z.string()).min(1).max(5000).describe('Array of Polymarket token IDs or Kalshi market IDs'),
-    },
-    async (params) => {
-      const prices = await getMarketPrices(client, params.markets);
-      return { content: [{ type: 'text', text: JSON.stringify(prices, null, 2) }] };
-    }
-  );
-
-  // ── get_orderbooks ──────────────────────────────────────────────────────────
-  server.tool('get_orderbooks',
-    'Get current orderbooks for multiple markets in one request (up to 5000).',
-    {
-      markets: z.array(z.string()).min(1).max(5000).describe('Array of Polymarket token IDs or Kalshi market IDs'),
-    },
-    async (params) => {
-      const orderbooks = await getOrderbooks(client, params.markets);
-      return { content: [{ type: 'text', text: JSON.stringify(orderbooks, null, 2) }] };
-    }
-  );
-
-  // ── get_sparklines ──────────────────────────────────────────────────────────
-  server.tool('get_sparklines',
-    'Get historical price sparklines for a batch of markets.',
-    {
-      markets: z.array(z.string()).min(1).describe('Array of Polymarket token IDs or Kalshi market IDs (with optional :Yes/:No suffix for Kalshi)'),
-    },
-    async (params) => {
-      const sparklines = await getSparklines(client, params.markets);
-      return { content: [{ type: 'text', text: JSON.stringify(sparklines, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(results) }] };
     }
   );
 
@@ -119,7 +84,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const data = await getHistoricalOrderbooks(client, params as Parameters<typeof getHistoricalOrderbooks>[1]);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -132,7 +97,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const stats = await getStatistics(client, params.venue, params.interval);
-      return { content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(stats) }] };
     }
   );
 
@@ -146,7 +111,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const data = await getRelatedMarkets(client, params.slug, params.limit, params.offset);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -159,7 +124,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const data = await getSimilarMarkets(client, params.market_id, params.venue);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -174,7 +139,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const data = await getSimilarPairs(client, params.sort, params.order, params.limit, params.offset);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -193,7 +158,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const markets = await listPolymarketMarkets(client, params);
-      return { content: [{ type: 'text', text: JSON.stringify({ count: markets.length, markets }, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(markets) }] };
     }
   );
 
@@ -202,7 +167,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     { condition_id: z.string().describe('0x hex condition ID') },
     async (params) => {
       const market = await getPolymarketMarket(client, params.condition_id);
-      return { content: [{ type: 'text', text: JSON.stringify(market, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(market) }] };
     }
   );
 
@@ -215,7 +180,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const market = await getPolymarketMarketBySlug(client, params.slug, params.sort, params.order);
-      return { content: [{ type: 'text', text: JSON.stringify(market, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(market) }] };
     }
   );
 
@@ -228,7 +193,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const data = await getPolymarketPriceHistory(client, params.token_id, { interval: params.interval, volume: params.volume });
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -241,7 +206,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const trades = await getPolymarketTrades(client, params.condition_id, params.limit, params.offset);
-      return { content: [{ type: 'text', text: JSON.stringify(trades, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(trades) }] };
     }
   );
 
@@ -250,7 +215,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     { token_id: z.string() },
     async (params) => {
       const stats = await getPolymarketStatistics(client, params.token_id);
-      return { content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(stats) }] };
     }
   );
 
@@ -269,7 +234,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const markets = await listKalshiMarkets(client, params);
-      return { content: [{ type: 'text', text: JSON.stringify({ count: markets.length, markets }, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(markets) }] };
     }
   );
 
@@ -278,7 +243,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     { market_id: z.string() },
     async (params) => {
       const market = await getKalshiMarket(client, params.market_id);
-      return { content: [{ type: 'text', text: JSON.stringify(market, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(market) }] };
     }
   );
 
@@ -291,7 +256,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const event = await getKalshiEvent(client, params.event_id, params.sort, params.order);
-      return { content: [{ type: 'text', text: JSON.stringify(event, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(event) }] };
     }
   );
 
@@ -304,7 +269,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const market = await getKalshiMarketBySlug(client, params.slug, params.sort, params.order);
-      return { content: [{ type: 'text', text: JSON.stringify(market, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(market) }] };
     }
   );
 
@@ -317,7 +282,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const trades = await getKalshiTrades(client, params.market_id, params.limit, params.offset);
-      return { content: [{ type: 'text', text: JSON.stringify(trades, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(trades) }] };
     }
   );
 
@@ -326,7 +291,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     { market_id: z.string() },
     async (params) => {
       const holders = await getKalshiHolders(client, params.market_id);
-      return { content: [{ type: 'text', text: JSON.stringify(holders, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(holders) }] };
     }
   );
 
@@ -335,7 +300,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     { market_id: z.string() },
     async (params) => {
       const stats = await getKalshiStatistics(client, params.market_id);
-      return { content: [{ type: 'text', text: JSON.stringify(stats, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(stats) }] };
     }
   );
 
@@ -355,7 +320,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     async (params) => {
       const { series_id, kalshi_id, ...rest } = params;
       const data = await getKalshiPriceHistory(client, series_id, kalshi_id, rest as Parameters<typeof getKalshiPriceHistory>[3]);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -375,7 +340,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     async (params) => {
       const { series_id, kalshi_id, ...rest } = params;
       const data = await getKalshiCandlesticks(client, series_id, kalshi_id, rest as Parameters<typeof getKalshiCandlesticks>[3]);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -388,7 +353,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const data = await getKalshiLeaderboard(client, params.metric, params.limit, params.since);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -397,7 +362,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     { username: z.string() },
     async (params) => {
       const data = await getKalshiUser(client, params.username);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -411,7 +376,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const news = await getNews(client, params.limit, params.offset);
-      return { content: [{ type: 'text', text: JSON.stringify(news, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(news) }] };
     }
   );
 
@@ -424,7 +389,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const news = await getEventNews(client, params.event_id, params.limit, params.offset);
-      return { content: [{ type: 'text', text: JSON.stringify(news, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(news) }] };
     }
   );
 
@@ -437,7 +402,7 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const news = await getMarketNews(client, params.market_id, params.limit, params.offset);
-      return { content: [{ type: 'text', text: JSON.stringify(news, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(news) }] };
     }
   );
 }

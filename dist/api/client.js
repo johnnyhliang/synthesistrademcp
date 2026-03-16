@@ -1,9 +1,14 @@
-const DEFAULT_BASE_URL = 'https://api.synthesis.trade/api/v1';
+const DEFAULT_BASE_URL = 'https://synthesis.trade/api/v1';
+const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_RETRIES = 3;
+const CACHE_TTL_MS = 60_000;
+const MAX_CACHE_ENTRIES = 1000;
 export class SynthesisClient {
     baseUrl;
     authMode;
     apiKey; // Bearer token (account key or session token)
     projectApiKey; // X-PROJECT-API-KEY
+    cache = new Map();
     constructor(config = {}) {
         this.baseUrl = config.baseUrl ?? process.env.SYNTHESIS_BASE_URL ?? DEFAULT_BASE_URL;
         this.authMode = config.authMode
@@ -18,7 +23,11 @@ export class SynthesisClient {
         return !!this.apiKey;
     }
     get tradingEnabled() {
-        return process.env.ENABLE_TRADING === 'true';
+        return process.env.ENABLE_TRADING === 'true' && !!process.env.TRADING_CONFIRMATION_PHRASE;
+    }
+    get maxOrderSizeUsdc() {
+        const v = process.env.MAX_ORDER_SIZE_USDC;
+        return v ? Math.max(1, Number(v)) : 100;
     }
     get authDescription() {
         if (!this.hasAuth)
@@ -58,6 +67,73 @@ export class SynthesisClient {
         }
         return headers;
     }
+    async fetchWithRetry(url, init) {
+        let lastError;
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+            try {
+                const res = await fetch(url, { ...init, signal: controller.signal });
+                if (res.status === 429 || res.status >= 500) {
+                    lastError = new SynthesisError(res.status, url, (await res.text().catch(() => '')).slice(0, 200));
+                    if (attempt < MAX_RETRIES) {
+                        await new Promise(r => setTimeout(r, Math.min(1000 * 2 ** attempt, 8000)));
+                        continue;
+                    }
+                }
+                return res;
+            }
+            catch (err) {
+                lastError = err instanceof Error ? err : new Error(String(err));
+                if (attempt < MAX_RETRIES) {
+                    await new Promise(r => setTimeout(r, Math.min(1000 * 2 ** attempt, 8000)));
+                    continue;
+                }
+            }
+            finally {
+                clearTimeout(timer);
+            }
+        }
+        throw lastError ?? new Error('Request failed after retries');
+    }
+    /** Build a cache key that includes auth context to prevent cross-user leaks in multi-user HTTP mode. */
+    cacheKey(url) {
+        const key = this.apiKey ?? this.projectApiKey ?? '';
+        const keySlice = key.length >= 8 ? key.slice(-8) : key;
+        return `${this.authMode}:${keySlice}:${url}`;
+    }
+    getCached(key) {
+        const entry = this.cache.get(key);
+        if (!entry)
+            return undefined;
+        if (Date.now() > entry.expires) {
+            this.cache.delete(key);
+            return undefined;
+        }
+        return entry.data;
+    }
+    setCache(key, data) {
+        const now = Date.now();
+        // Sweep expired entries on every insert
+        for (const [k, v] of this.cache) {
+            if (now > v.expires)
+                this.cache.delete(k);
+        }
+        // If still at capacity, evict oldest by insertedAt
+        if (this.cache.size >= MAX_CACHE_ENTRIES) {
+            let oldestKey;
+            let oldestTime = Infinity;
+            for (const [k, v] of this.cache) {
+                if (v.insertedAt < oldestTime) {
+                    oldestTime = v.insertedAt;
+                    oldestKey = k;
+                }
+            }
+            if (oldestKey)
+                this.cache.delete(oldestKey);
+        }
+        this.cache.set(key, { data, expires: now + CACHE_TTL_MS, insertedAt: now });
+    }
     async get(path, params) {
         const url = new URL(`${this.baseUrl}/${path}`);
         if (params) {
@@ -67,28 +143,33 @@ export class SynthesisClient {
                 }
             }
         }
-        const res = await fetch(url.toString(), {
+        const ck = this.cacheKey(url.toString());
+        const cached = this.getCached(ck);
+        if (cached !== undefined)
+            return cached;
+        const res = await this.fetchWithRetry(url.toString(), {
             method: 'GET',
             headers: this.headers(),
         });
         if (!res.ok) {
-            const body = await res.text().catch(() => '');
+            const body = (await res.text().catch(() => '')).slice(0, 200);
             throw new SynthesisError(res.status, path, body);
         }
         const json = await res.json();
         if (!json.success) {
             throw new SynthesisError(200, path, 'API returned success: false');
         }
+        this.setCache(ck, json.response);
         return json.response;
     }
     async request(method, path, body) {
-        const res = await fetch(`${this.baseUrl}/${path}`, {
+        const res = await this.fetchWithRetry(`${this.baseUrl}/${path}`, {
             method,
             headers: this.headers(),
             body: body !== undefined ? JSON.stringify(body) : undefined,
         });
         if (!res.ok) {
-            const text = await res.text().catch(() => '');
+            const text = (await res.text().catch(() => '')).slice(0, 200);
             throw new SynthesisError(res.status, path, text);
         }
         const json = await res.json();
@@ -118,8 +199,24 @@ export class SynthesisClient {
     }
     requireTrading() {
         this.requireAuth();
-        if (!this.tradingEnabled) {
+        if (process.env.ENABLE_TRADING !== 'true') {
             throw new Error('Trading tools are disabled. Set ENABLE_TRADING=true in your MCP server config to enable them.');
+        }
+        if (!process.env.TRADING_CONFIRMATION_PHRASE) {
+            throw new Error('Trading requires a confirmation phrase. Set TRADING_CONFIRMATION_PHRASE to a secret phrase in your MCP server config.');
+        }
+    }
+    verifyTradingConfirmation(phrase) {
+        this.requireTrading();
+        const expected = process.env.TRADING_CONFIRMATION_PHRASE;
+        if (phrase !== expected) {
+            throw new Error('Trading confirmation phrase does not match. Check your TRADING_CONFIRMATION_PHRASE env var.');
+        }
+    }
+    verifyOrderSize(sizeUsdc) {
+        const max = this.maxOrderSizeUsdc;
+        if (sizeUsdc > max) {
+            throw new Error(`Order size $${sizeUsdc} exceeds maximum allowed $${max}. Set MAX_ORDER_SIZE_USDC to increase the limit.`);
         }
     }
 }

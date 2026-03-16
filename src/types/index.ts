@@ -97,6 +97,14 @@ export interface KalshiEvent {
   ends_at: string;
 }
 
+export interface DflowData {
+  noMint: unknown;
+  yesMint: unknown;
+  marketLedger: unknown;
+  isInitialized: boolean;
+  redemptionStatus: unknown;
+}
+
 export interface KalshiMarket {
   series_id: string;
   event_id: string;
@@ -120,7 +128,7 @@ export interface KalshiMarket {
   open_interest: number | string;
   volume: number | string;
   volume24hr: number | string;
-  dflow: boolean;
+  dflow: Record<string, DflowData> | null;
   jupiter: boolean;
   ends_at: string;
   created_at: string;
@@ -140,16 +148,58 @@ export interface UnifiedMarket {
   markets: PolymarketMarket[] | KalshiMarket[];
 }
 
-// ─── Query Params ─────────────────────────────────────────────────────────────
+// ─── News ─────────────────────────────────────────────────────────────────────
 
-export interface MarketsParams {
-  venue?: 'polymarket' | 'kalshi';
-  limit?: number;
-  offset?: number;
-  search?: string;
-  tag?: string;
-  active?: boolean;
-  sort?: string;
+export interface NewsArticle {
+  title: string;
+  source: string;
+  url: string;
+  published_at: string;
+  [key: string]: unknown; // Allow additional fields from API
+}
+
+// ─── Account ──────────────────────────────────────────────────────────────────
+
+export interface AccountSession {
+  authenticated: boolean;
+}
+
+export interface ApiKeyInfo {
+  public_key: string;
+  name: string;
+  active: boolean;
+  created_at: string;
+  [key: string]: unknown;
+}
+
+// ─── Wallets ──────────────────────────────────────────────────────────────────
+
+export interface WalletChain {
+  address: string;
+  [key: string]: unknown;
+}
+
+export interface Wallet {
+  wallet_id: string;
+  name: string;
+  chains: Record<string, WalletChain>;
+  position: number;
+  autoredeem: boolean;
+  [key: string]: unknown;
+}
+
+// ─── Polygon / Trading ────────────────────────────────────────────────────────
+
+export interface TradeRecord {
+  [key: string]: unknown;
+}
+
+export interface OrderRecord {
+  [key: string]: unknown;
+}
+
+export interface SwapRecord {
+  [key: string]: unknown;
 }
 
 // ─── Auth / Config ────────────────────────────────────────────────────────────

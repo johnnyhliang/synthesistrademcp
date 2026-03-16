@@ -10,7 +10,15 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx src/mcp/server.ts",
-    "start": "node dist/mcp/server.js"
+    "dev:http": "tsx src/mcp/server-http.ts",
+    "start": "node dist/mcp/server.js",
+    "start:http": "node dist/mcp/server-http.js",
+    "test": "npm run test:cache && npm run test:stdio && npm run test:http && npm run test:multiuser",
+    "test:cache": "tsx scripts/test-cache.ts",
+    "test:stdio": "tsx scripts/test-stdio.ts",
+    "test:http": "tsx scripts/test-http.ts",
+    "test:multiuser": "tsx scripts/test-multiuser.ts",
+    "api:check": "tsx scripts/api-sync-check.ts"
   },
   "keywords": ["mcp", "synthesis", "polymarket", "kalshi", "prediction-markets"],
   "author": "",

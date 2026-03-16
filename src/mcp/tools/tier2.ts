@@ -6,8 +6,9 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SynthesisClient } from '../../api/client.js';
 import { getRecommendations } from '../../api/markets.js';
-import { getWallets, createWallet, updateWallet, deleteWallet } from '../../api/wallets.js';
+import { getWallets, createWallet, updateWallet, deleteWallet, reorderWallets, exportWallet } from '../../api/wallets.js';
 import { getSession, getApiKeys, getInterests, updateInterests } from '../../api/account.js';
+import { summarize } from '../../utils/trim.js';
 
 export function registerTier2Tools(server: McpServer, client: SynthesisClient): void {
 
@@ -21,7 +22,7 @@ export function registerTier2Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const data = await getRecommendations(client, params.limit, params.offset);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -32,7 +33,7 @@ export function registerTier2Tools(server: McpServer, client: SynthesisClient): 
     {},
     async () => {
       const data = await getSession(client);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -41,7 +42,7 @@ export function registerTier2Tools(server: McpServer, client: SynthesisClient): 
     {},
     async () => {
       const data = await getApiKeys(client);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -50,7 +51,7 @@ export function registerTier2Tools(server: McpServer, client: SynthesisClient): 
     {},
     async () => {
       const data = await getInterests(client);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -61,7 +62,7 @@ export function registerTier2Tools(server: McpServer, client: SynthesisClient): 
     },
     async (params) => {
       const data = await updateInterests(client, params.interests);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -72,7 +73,7 @@ export function registerTier2Tools(server: McpServer, client: SynthesisClient): 
     {},
     async () => {
       const data = await getWallets(client);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -81,7 +82,7 @@ export function registerTier2Tools(server: McpServer, client: SynthesisClient): 
     {},
     async () => {
       const data = await createWallet(client);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -95,7 +96,7 @@ export function registerTier2Tools(server: McpServer, client: SynthesisClient): 
     async (params) => {
       const { wallet_id, ...updates } = params;
       const data = await updateWallet(client, wallet_id, updates);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
@@ -104,7 +105,32 @@ export function registerTier2Tools(server: McpServer, client: SynthesisClient): 
     { wallet_id: z.string() },
     async (params) => {
       const data = await deleteWallet(client, params.wallet_id);
-      return { content: [{ type: 'text', text: JSON.stringify(data, null, 2) }] };
+      return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
+
+  server.tool('reorder_wallets',
+    'Reorder wallets by position. Pass wallet IDs in desired order. Requires SYNTHESIS_API_KEY.',
+    {
+      wallet_ids: z.array(z.string()).min(1).describe('Wallet IDs in desired display order'),
+    },
+    async (params) => {
+      const data = await reorderWallets(client, params.wallet_ids);
+      return { content: [{ type: 'text', text: summarize(data) }] };
+    }
+  );
+
+  server.tool('export_wallet',
+    'Export a wallet\'s encrypted private key material. WARNING: This exports sensitive cryptographic data. The response contains encrypted key material that can be used to reconstruct the wallet\'s private key. Handle with extreme care. Requires SYNTHESIS_API_KEY.',
+    {
+      chain_id: z.string().describe('Chain ID (e.g. "polygon", "solana")'),
+      wallet_id: z.string().describe('Wallet ID to export'),
+      public_key: z.string().describe('Your HPKE public key for encrypting the export'),
+    },
+    async (params) => {
+      const data = await exportWallet(client, params.chain_id, params.wallet_id, params.public_key);
+      return { content: [{ type: 'text', text: summarize(data) }] };
+    }
+  );
+
 }

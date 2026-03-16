@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "synthesis": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["dist/mcp/server.js"],
+      "env": {
+        "SYNTHESIS_API_KEY": "sk_your_secret_key_here"
+      }
+    }
+  }
+}
