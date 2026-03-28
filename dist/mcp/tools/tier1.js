@@ -1,6 +1,3 @@
-/**
- * Tier 1 — All public endpoints. No authentication required.
- */
 import { z } from 'zod';
 import { listMarkets, searchMarkets, getHistoricalOrderbooks, getStatistics, getRelatedMarkets, getSimilarMarkets, getSimilarPairs, } from '../../api/markets.js';
 import { listPolymarketMarkets, getPolymarketMarket, getPolymarketMarketBySlug, getPolymarketPriceHistory, getPolymarketTrades, getPolymarketStatistics, } from '../../api/polymarket.js';
@@ -8,7 +5,6 @@ import { listKalshiMarkets, getKalshiMarket, getKalshiEvent, getKalshiMarketBySl
 import { getNews, getEventNews, getMarketNews } from '../../api/news.js';
 import { summarize } from '../../utils/trim.js';
 export function registerTier1Tools(server, client) {
-    // ── list_markets ────────────────────────────────────────────────────────────
     server.tool('list_markets', 'List prediction markets from Polymarket and/or Kalshi with rich filtering and sorting.', {
         venue: z.enum(['polymarket', 'kalshi']).optional(),
         sort: z.enum(['liquidity', 'volume', 'created_at', 'ends_at', 'newest']).optional(),
@@ -26,7 +22,6 @@ export function registerTier1Tools(server, client) {
         const markets = await listMarkets(client, params);
         return { content: [{ type: 'text', text: summarize(markets) }] };
     });
-    // ── search_markets ──────────────────────────────────────────────────────────
     server.tool('search_markets', 'Full-text search across market titles. Supports venue filtering, price range, and sort.', {
         query: z.string().describe('Search term'),
         venue: z.enum(['polymarket', 'kalshi']).optional(),
@@ -42,7 +37,6 @@ export function registerTier1Tools(server, client) {
         const results = await searchMarkets(client, query, params);
         return { content: [{ type: 'text', text: summarize(results) }] };
     });
-    // ── get_historical_orderbooks ───────────────────────────────────────────────
     server.tool('get_historical_orderbooks', 'Get historical orderbook snapshots for a single market with time bucketing.', {
         venue: z.enum(['polymarket', 'kalshi']),
         token_id: z.string().optional().describe('Required for Polymarket'),
@@ -54,10 +48,15 @@ export function registerTier1Tools(server, client) {
         bucket: z.enum(['30', '30s', '5m', '1h', '1d']).optional().describe('Time aggregation bucket'),
         points: z.number().int().max(25000).optional().describe('Target point count'),
     }, async (params) => {
+        if (params.venue === 'polymarket' && !params.token_id) {
+            return { content: [{ type: 'text', text: 'Error: token_id is required when venue is polymarket' }] };
+        }
+        if (params.venue === 'kalshi' && !params.market_id) {
+            return { content: [{ type: 'text', text: 'Error: market_id is required when venue is kalshi' }] };
+        }
         const data = await getHistoricalOrderbooks(client, params);
         return { content: [{ type: 'text', text: summarize(data) }] };
     });
-    // ── get_market_statistics ───────────────────────────────────────────────────
     server.tool('get_market_statistics', 'Get aggregate platform statistics (total markets, active markets, volume) by venue and time interval.', {
         venue: z.enum(['polymarket', 'kalshi']).optional(),
         interval: z.enum(['24h', '1w', '1m', '6m', '1y']).optional().describe('Default 24h'),
@@ -65,7 +64,6 @@ export function registerTier1Tools(server, client) {
         const stats = await getStatistics(client, params.venue, params.interval);
         return { content: [{ type: 'text', text: summarize(stats) }] };
     });
-    // ── get_related_markets ─────────────────────────────────────────────────────
     server.tool('get_related_markets', 'Find markets related by topic to a given event slug.', {
         slug: z.string().describe('Event slug'),
         limit: z.number().int().optional(),
@@ -74,7 +72,6 @@ export function registerTier1Tools(server, client) {
         const data = await getRelatedMarkets(client, params.slug, params.limit, params.offset);
         return { content: [{ type: 'text', text: summarize(data) }] };
     });
-    // ── get_similar_markets ─────────────────────────────────────────────────────
     server.tool('get_similar_markets', 'Find markets similar to a given market by similarity index (useful for cross-venue comparison).', {
         market_id: z.string().describe('Condition ID or Kalshi market ID'),
         venue: z.enum(['polymarket', 'kalshi']).optional(),
@@ -82,7 +79,6 @@ export function registerTier1Tools(server, client) {
         const data = await getSimilarMarkets(client, params.market_id, params.venue);
         return { content: [{ type: 'text', text: summarize(data) }] };
     });
-    // ── get_arbitrage_pairs ─────────────────────────────────────────────────────
     server.tool('get_arbitrage_pairs', 'Get cross-venue market pairs sorted by arbitrage opportunity.', {
         sort: z.string().optional().describe('Default: arbitrage'),
         order: z.enum(['ASC', 'DESC']).optional(),
@@ -92,7 +88,6 @@ export function registerTier1Tools(server, client) {
         const data = await getSimilarPairs(client, params.sort, params.order, params.limit, params.offset);
         return { content: [{ type: 'text', text: summarize(data) }] };
     });
-    // ── Polymarket tools ─────────────────────────────────────────────────────────
     server.tool('list_polymarket_markets', 'List Polymarket markets with sorting and filtering.', {
         sort: z.enum(['left_price', 'right_price', 'liquidity', 'volume', 'volume24hr', 'volume1wk', 'volume1mo', 'volume1yr', 'created_at', 'ends_at']).optional(),
         order: z.enum(['ASC', 'DESC']).optional(),
@@ -106,6 +101,9 @@ export function registerTier1Tools(server, client) {
         return { content: [{ type: 'text', text: summarize(markets) }] };
     });
     server.tool('get_polymarket_market', 'Get a specific Polymarket event and all its outcome markets by condition ID.', { condition_id: z.string().describe('0x hex condition ID') }, async (params) => {
+        if (!params.condition_id.startsWith('0x')) {
+            return { content: [{ type: 'text', text: 'Error: condition_id must be a 0x hex string (e.g. 0x1234...)' }] };
+        }
         const market = await getPolymarketMarket(client, params.condition_id);
         return { content: [{ type: 'text', text: summarize(market) }] };
     });
@@ -137,7 +135,6 @@ export function registerTier1Tools(server, client) {
         const stats = await getPolymarketStatistics(client, params.token_id);
         return { content: [{ type: 'text', text: summarize(stats) }] };
     });
-    // ── Kalshi tools ──────────────────────────────────────────────────────────────
     server.tool('list_kalshi_markets', 'List Kalshi markets with sorting and filtering.', {
         sort: z.enum(['left_price', 'right_price', 'liquidity', 'volume', 'created_at', 'ends_at']).optional(),
         order: z.enum(['ASC', 'DESC']).optional(),
@@ -228,7 +225,6 @@ export function registerTier1Tools(server, client) {
         const data = await getKalshiUser(client, params.username);
         return { content: [{ type: 'text', text: summarize(data) }] };
     });
-    // ── News tools ────────────────────────────────────────────────────────────────
     server.tool('get_news', 'Get recent news articles matched to prediction markets.', {
         limit: z.number().int().optional().describe('Default 10'),
         offset: z.number().int().optional(),

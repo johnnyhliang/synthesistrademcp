@@ -12,7 +12,6 @@ export interface KalshiMarketsParams {
   markets?: boolean;
 }
 
-// GET /api/v1/kalshi/markets
 export async function listKalshiMarkets(
   client: SynthesisClient,
   params: KalshiMarketsParams = {}
@@ -20,7 +19,6 @@ export async function listKalshiMarkets(
   return client.get<KalshiEventWithMarkets[]>('kalshi/markets', params as unknown as Record<string, string | number | boolean | undefined>);
 }
 
-// GET /api/v1/kalshi/market/{market_id}
 export async function getKalshiMarket(
   client: SynthesisClient,
   marketId: string
@@ -28,7 +26,6 @@ export async function getKalshiMarket(
   return client.get<KalshiEventWithMarkets>(`kalshi/market/${marketId}`);
 }
 
-// GET /api/v1/kalshi/market/event/{event_id}
 export async function getKalshiEvent(
   client: SynthesisClient,
   eventId: string,
@@ -38,7 +35,6 @@ export async function getKalshiEvent(
   return client.get<KalshiEventWithMarkets>(`kalshi/market/event/${encodeURIComponent(eventId)}`, { sort, order });
 }
 
-// GET /api/v1/kalshi/market/slug/{slug}
 export async function getKalshiMarketBySlug(
   client: SynthesisClient,
   slug: string,
@@ -48,7 +44,6 @@ export async function getKalshiMarketBySlug(
   return client.get<KalshiEventWithMarkets>(`kalshi/market/slug/${encodeURIComponent(slug)}`, { sort, order });
 }
 
-// GET /api/v1/kalshi/market/{market_id}/trades
 export async function getKalshiTrades(
   client: SynthesisClient,
   marketId: string,
@@ -58,7 +53,6 @@ export async function getKalshiTrades(
   return client.get<unknown[]>(`kalshi/market/${marketId}/trades`, { limit, offset });
 }
 
-// GET /api/v1/kalshi/market/{market_id}/holders
 export async function getKalshiHolders(
   client: SynthesisClient,
   marketId: string
@@ -66,7 +60,6 @@ export async function getKalshiHolders(
   return client.get<unknown[]>(`kalshi/market/${marketId}/holders`);
 }
 
-// GET /api/v1/kalshi/market/{market_id}/statistics
 export async function getKalshiStatistics(
   client: SynthesisClient,
   marketId: string
@@ -84,7 +77,6 @@ export interface KalshiPriceHistoryParams {
   offset?: number;
 }
 
-// GET /api/v1/kalshi/market/{series_id}/{kalshi_id}/price-history
 export async function getKalshiPriceHistory(
   client: SynthesisClient,
   seriesId: string,
@@ -94,7 +86,6 @@ export async function getKalshiPriceHistory(
   return client.get<unknown[]>(`kalshi/market/${seriesId}/${kalshiId}/price-history`, params as unknown as Record<string, string | number | boolean | undefined>);
 }
 
-// GET /api/v1/kalshi/market/{series_id}/{kalshi_id}/candlesticks
 export async function getKalshiCandlesticks(
   client: SynthesisClient,
   seriesId: string,
@@ -104,7 +95,6 @@ export async function getKalshiCandlesticks(
   return client.get<unknown[]>(`kalshi/market/${seriesId}/${kalshiId}/candlesticks`, params as unknown as Record<string, string | number | boolean | undefined>);
 }
 
-// GET /api/v1/kalshi/leaderboard — public
 export async function getKalshiLeaderboard(
   client: SynthesisClient,
   metric?: string,
@@ -114,7 +104,6 @@ export async function getKalshiLeaderboard(
   return client.get<unknown>('kalshi/leaderboard', { metric, limit, since });
 }
 
-// GET /api/v1/kalshi/user/{username} — public
 export async function getKalshiUser(
   client: SynthesisClient,
   username: string

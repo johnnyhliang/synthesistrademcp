@@ -1,6 +1,3 @@
-/**
- * Tier 1 — All public endpoints. No authentication required.
- */
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SynthesisClient } from '../../api/client.js';
@@ -24,7 +21,6 @@ import { summarize } from '../../utils/trim.js';
 
 export function registerTier1Tools(server: McpServer, client: SynthesisClient): void {
 
-  // ── list_markets ────────────────────────────────────────────────────────────
   server.tool('list_markets',
     'List prediction markets from Polymarket and/or Kalshi with rich filtering and sorting.',
     {
@@ -47,7 +43,6 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     }
   );
 
-  // ── search_markets ──────────────────────────────────────────────────────────
   server.tool('search_markets',
     'Full-text search across market titles. Supports venue filtering, price range, and sort.',
     {
@@ -68,7 +63,6 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     }
   );
 
-  // ── get_historical_orderbooks ───────────────────────────────────────────────
   server.tool('get_historical_orderbooks',
     'Get historical orderbook snapshots for a single market with time bucketing.',
     {
@@ -83,12 +77,17 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
       points: z.number().int().max(25000).optional().describe('Target point count'),
     },
     async (params) => {
+      if (params.venue === 'polymarket' && !params.token_id) {
+        return { content: [{ type: 'text', text: 'Error: token_id is required when venue is polymarket' }] };
+      }
+      if (params.venue === 'kalshi' && !params.market_id) {
+        return { content: [{ type: 'text', text: 'Error: market_id is required when venue is kalshi' }] };
+      }
       const data = await getHistoricalOrderbooks(client, params as Parameters<typeof getHistoricalOrderbooks>[1]);
       return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
 
-  // ── get_market_statistics ───────────────────────────────────────────────────
   server.tool('get_market_statistics',
     'Get aggregate platform statistics (total markets, active markets, volume) by venue and time interval.',
     {
@@ -101,7 +100,6 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     }
   );
 
-  // ── get_related_markets ─────────────────────────────────────────────────────
   server.tool('get_related_markets',
     'Find markets related by topic to a given event slug.',
     {
@@ -115,7 +113,6 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     }
   );
 
-  // ── get_similar_markets ─────────────────────────────────────────────────────
   server.tool('get_similar_markets',
     'Find markets similar to a given market by similarity index (useful for cross-venue comparison).',
     {
@@ -128,7 +125,6 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     }
   );
 
-  // ── get_arbitrage_pairs ─────────────────────────────────────────────────────
   server.tool('get_arbitrage_pairs',
     'Get cross-venue market pairs sorted by arbitrage opportunity.',
     {
@@ -142,8 +138,6 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
       return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
-
-  // ── Polymarket tools ─────────────────────────────────────────────────────────
 
   server.tool('list_polymarket_markets',
     'List Polymarket markets with sorting and filtering.',
@@ -166,6 +160,9 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
     'Get a specific Polymarket event and all its outcome markets by condition ID.',
     { condition_id: z.string().describe('0x hex condition ID') },
     async (params) => {
+      if (!params.condition_id.startsWith('0x')) {
+        return { content: [{ type: 'text', text: 'Error: condition_id must be a 0x hex string (e.g. 0x1234...)' }] };
+      }
       const market = await getPolymarketMarket(client, params.condition_id);
       return { content: [{ type: 'text', text: summarize(market) }] };
     }
@@ -218,8 +215,6 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
       return { content: [{ type: 'text', text: summarize(stats) }] };
     }
   );
-
-  // ── Kalshi tools ──────────────────────────────────────────────────────────────
 
   server.tool('list_kalshi_markets',
     'List Kalshi markets with sorting and filtering.',
@@ -365,8 +360,6 @@ export function registerTier1Tools(server: McpServer, client: SynthesisClient): 
       return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
-
-  // ── News tools ────────────────────────────────────────────────────────────────
 
   server.tool('get_news',
     'Get recent news articles matched to prediction markets.',

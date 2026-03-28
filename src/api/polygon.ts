@@ -1,8 +1,6 @@
 import type { SynthesisClient } from './client.js';
 import type { TradeRecord, OrderRecord, SwapRecord } from '../types/index.js';
 
-// ─── All Polygon endpoints require auth ───────────────────────────────────────
-
 export async function getBalances(client: SynthesisClient): Promise<TradeRecord[]> {
   client.requireAuth();
   return client.get<TradeRecord[]>('polygon/balances');
@@ -17,8 +15,6 @@ export async function getSwaps(client: SynthesisClient): Promise<SwapRecord[]> {
   client.requireAuth();
   return client.get<SwapRecord[]>('polygon/swaps');
 }
-
-// ─── Trading endpoints require auth + ENABLE_TRADING=true ────────────────────
 
 export async function placeOrder(
   client: SynthesisClient,

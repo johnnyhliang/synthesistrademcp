@@ -1,14 +1,28 @@
 {
-  "name": "synthesismcp",
+  "name": "mcp-server-synthesis",
   "version": "1.0.0",
-  "description": "MCP server and CLI for api.synthesis.trade prediction markets",
+  "description": "MCP server for synthesis.trade prediction markets — Polymarket & Kalshi data, wallets, and trading via Model Context Protocol",
   "type": "module",
   "main": "dist/mcp/server.js",
   "bin": {
-    "synthesis-mcp": "dist/mcp/server.js"
+    "mcp-server-synthesis": "dist/mcp/server.js",
+    "mcp-server-synthesis-http": "dist/mcp/server-http.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "exports": {
+    ".": "./dist/mcp/server.js",
+    "./http": "./dist/mcp/server-http.js",
+    "./client": "./dist/api/client.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node -e \"require('fs').chmodSync('dist/mcp/server.js',0o755);require('fs').chmodSync('dist/mcp/server-http.js',0o755)\" 2>/dev/null || true",
     "dev": "tsx src/mcp/server.ts",
     "dev:http": "tsx src/mcp/server-http.ts",
     "start": "node dist/mcp/server.js",
@@ -18,11 +32,16 @@
     "test:stdio": "tsx scripts/test-stdio.ts",
     "test:http": "tsx scripts/test-http.ts",
     "test:multiuser": "tsx scripts/test-multiuser.ts",
-    "api:check": "tsx scripts/api-sync-check.ts"
+    "api:check": "tsx scripts/api-sync-check.ts",
+    "prepublishOnly": "npm run build && npm test"
   },
-  "keywords": ["mcp", "synthesis", "polymarket", "kalshi", "prediction-markets"],
+  "keywords": ["mcp", "synthesis", "polymarket", "kalshi", "prediction-markets", "model-context-protocol"],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/liang/mcp-server-synthesis"
+  },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
     "zod": "^4.3.6"

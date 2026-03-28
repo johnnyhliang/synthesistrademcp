@@ -1,11 +1,7 @@
-// ─── API Response Envelope ────────────────────────────────────────────────────
-
 export interface ApiResponse<T> {
   success: boolean;
   response: T;
 }
-
-// ─── Shared ───────────────────────────────────────────────────────────────────
 
 export interface LiveData {
   live: boolean;
@@ -16,8 +12,6 @@ export interface LiveData {
   game_id: string | null;
   game_status: string | null;
 }
-
-// ─── Polymarket ───────────────────────────────────────────────────────────────
 
 export interface PolymarketEvent {
   event_id: number;
@@ -75,8 +69,6 @@ export interface PolymarketEventWithMarkets {
   event: PolymarketEvent;
   markets: PolymarketMarket[];
 }
-
-// ─── Kalshi ───────────────────────────────────────────────────────────────────
 
 export interface KalshiEvent {
   series_id: string;
@@ -140,25 +132,19 @@ export interface KalshiEventWithMarkets {
   markets: KalshiMarket[];
 }
 
-// ─── Unified Market ───────────────────────────────────────────────────────────
-
 export interface UnifiedMarket {
   venue: 'polymarket' | 'kalshi';
   event: PolymarketEvent | KalshiEvent;
   markets: PolymarketMarket[] | KalshiMarket[];
 }
 
-// ─── News ─────────────────────────────────────────────────────────────────────
-
 export interface NewsArticle {
   title: string;
   source: string;
   url: string;
   published_at: string;
-  [key: string]: unknown; // Allow additional fields from API
+  [key: string]: unknown;
 }
-
-// ─── Account ──────────────────────────────────────────────────────────────────
 
 export interface AccountSession {
   authenticated: boolean;
@@ -171,8 +157,6 @@ export interface ApiKeyInfo {
   created_at: string;
   [key: string]: unknown;
 }
-
-// ─── Wallets ──────────────────────────────────────────────────────────────────
 
 export interface WalletChain {
   address: string;
@@ -188,8 +172,6 @@ export interface Wallet {
   [key: string]: unknown;
 }
 
-// ─── Polygon / Trading ────────────────────────────────────────────────────────
-
 export interface TradeRecord {
   [key: string]: unknown;
 }
@@ -202,16 +184,11 @@ export interface SwapRecord {
   [key: string]: unknown;
 }
 
-// ─── Auth / Config ────────────────────────────────────────────────────────────
-
 export type AuthMode = 'account' | 'project' | 'session';
 
 export interface ClientConfig {
-  /** Auth mode — defaults to 'account' */
   authMode?: AuthMode;
-  /** Bearer token (account API key or session token) */
   apiKey?: string;
-  /** Project API key — used with authMode 'project' */
   projectApiKey?: string;
   baseUrl?: string;
 }

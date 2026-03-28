@@ -1,14 +1,3 @@
-/**
- * Tier 3 — Trading tools.
- *
- * Defense layers:
- *  1. ENABLE_TRADING=true env var (tools not even registered without it)
- *  2. TRADING_CONFIRMATION_PHRASE env var (must be set — no default)
- *  3. Per-call `confirmation_phrase` parameter (must match the env var)
- *  4. Per-call `confirm` parameter (must be exactly "I understand this is a real financial transaction")
- *  5. MAX_ORDER_SIZE_USDC env var (default $100, caps place_order and swap amounts)
- *  6. requireTrading() check at the API layer (belt-and-suspenders)
- */
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SynthesisClient } from '../../api/client.js';
@@ -30,7 +19,6 @@ export function registerTier3Tools(server: McpServer, client: SynthesisClient): 
   const phraseSchema = z.string()
     .describe('Your TRADING_CONFIRMATION_PHRASE (must match the env var set on the server)');
 
-  // ── place_order ─────────────────────────────────────────────────────────────
   server.tool(
     'place_order',
     `Place a buy or sell order on Polymarket via Polygon. Requires ENABLE_TRADING=true, TRADING_CONFIRMATION_PHRASE, and per-call confirmation. Max order size: $${client.maxOrderSizeUsdc} USDC.`,
@@ -55,7 +43,6 @@ export function registerTier3Tools(server: McpServer, client: SynthesisClient): 
     }
   );
 
-  // ── cancel_order ────────────────────────────────────────────────────────────
   server.tool(
     'cancel_order',
     'Cancel an open order on Polygon. Requires ENABLE_TRADING=true, TRADING_CONFIRMATION_PHRASE, and per-call confirmation.',
@@ -71,7 +58,6 @@ export function registerTier3Tools(server: McpServer, client: SynthesisClient): 
     }
   );
 
-  // ── swap ────────────────────────────────────────────────────────────────────
   server.tool(
     'swap',
     `Execute a token swap on Polygon. Requires ENABLE_TRADING=true, TRADING_CONFIRMATION_PHRASE, and per-call confirmation. Max amount: $${client.maxOrderSizeUsdc} USDC.`,
@@ -94,7 +80,6 @@ export function registerTier3Tools(server: McpServer, client: SynthesisClient): 
     }
   );
 
-  // ── withdraw ─────────────────────────────────────────────────────────────────
   server.tool(
     'withdraw',
     `Withdraw funds from your Synthesis wallet. Requires ENABLE_TRADING=true, TRADING_CONFIRMATION_PHRASE, and per-call confirmation. Max amount: $${client.maxOrderSizeUsdc} USDC.`,

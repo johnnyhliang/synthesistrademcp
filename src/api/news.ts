@@ -1,7 +1,6 @@
 import type { SynthesisClient } from './client.js';
 import type { NewsArticle } from '../types/index.js';
 
-// GET /api/v1/news
 export async function getNews(
   client: SynthesisClient,
   limit?: number,
@@ -10,7 +9,6 @@ export async function getNews(
   return client.get<NewsArticle[]>('news', { limit, offset });
 }
 
-// GET /api/v1/news/event/{event_id}
 export async function getEventNews(
   client: SynthesisClient,
   eventId: string,
@@ -20,7 +18,6 @@ export async function getEventNews(
   return client.get<NewsArticle[]>(`news/event/${encodeURIComponent(eventId)}`, { limit, offset });
 }
 
-// GET /api/v1/news/market/{market_id}
 export async function getMarketNews(
   client: SynthesisClient,
   marketId: string,

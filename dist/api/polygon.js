@@ -1,4 +1,3 @@
-// ─── All Polygon endpoints require auth ───────────────────────────────────────
 export async function getBalances(client) {
     client.requireAuth();
     return client.get('polygon/balances');
@@ -11,7 +10,6 @@ export async function getSwaps(client) {
     client.requireAuth();
     return client.get('polygon/swaps');
 }
-// ─── Trading endpoints require auth + ENABLE_TRADING=true ────────────────────
 export async function placeOrder(client, order) {
     client.requireTrading();
     return client.post('polygon/orders', order);

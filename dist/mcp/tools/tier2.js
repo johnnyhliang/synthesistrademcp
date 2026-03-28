@@ -1,14 +1,9 @@
-/**
- * Tier 2 — Auth-required tools (SYNTHESIS_API_KEY).
- * Wallets, account management, personalized recommendations.
- */
 import { z } from 'zod';
 import { getRecommendations } from '../../api/markets.js';
 import { getWallets, createWallet, updateWallet, deleteWallet, reorderWallets, exportWallet } from '../../api/wallets.js';
 import { getSession, getApiKeys, getInterests, updateInterests } from '../../api/account.js';
 import { summarize } from '../../utils/trim.js';
 export function registerTier2Tools(server, client) {
-    // ── Personalized recommendations ─────────────────────────────────────────────
     server.tool('get_recommendations', 'Get personalized market recommendations based on account interests. Requires SYNTHESIS_API_KEY.', {
         limit: z.number().int().optional().describe('Default 20'),
         offset: z.number().int().optional(),
@@ -16,7 +11,6 @@ export function registerTier2Tools(server, client) {
         const data = await getRecommendations(client, params.limit, params.offset);
         return { content: [{ type: 'text', text: summarize(data) }] };
     });
-    // ── Account ───────────────────────────────────────────────────────────────────
     server.tool('get_account_session', 'Verify current authentication status. Requires SYNTHESIS_API_KEY.', {}, async () => {
         const data = await getSession(client);
         return { content: [{ type: 'text', text: summarize(data) }] };
@@ -35,7 +29,6 @@ export function registerTier2Tools(server, client) {
         const data = await updateInterests(client, params.interests);
         return { content: [{ type: 'text', text: summarize(data) }] };
     });
-    // ── Wallets ───────────────────────────────────────────────────────────────────
     server.tool('get_wallets', 'Get wallets for the authenticated account (auto-creates first wallet if none exist). Requires SYNTHESIS_API_KEY.', {}, async () => {
         const data = await getWallets(client);
         return { content: [{ type: 'text', text: summarize(data) }] };

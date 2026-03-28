@@ -366,25 +366,24 @@ git push --follow-tags
 
 ---
 
-## Priority Order
+## Execution Status
 
-| Phase | Impact | Effort | Priority |
-|-------|--------|--------|----------|
-| 6. npm Packaging | **Very High** | Low | **P0** — biggest UX gap, enables `npx` |
-| 1. Structured Logging | High | Medium | **P0** — blind without it |
-| 8. CI/CD Pipeline | High | Low | **P0** — enables safe publishing |
-| 2. Upstream Health Check | High | Low | **P1** — load balancers need this |
-| 4. Graceful Shutdown | High | Low | **P1** — dropped requests on deploy |
-| 3. Cache Invalidation | Medium | Low | **P1** — correctness bug |
-| 5. Input Validation | Medium | Low | **P1** — better LLM UX |
-| 7. Project Structure | Medium | Medium | **P2** — hygiene, conventions |
-| 10. Docker | Medium | Medium | **P2** — deployment story |
-| 9. Distributed Rate Limiting | Low | High | **P3** — multi-instance only |
+| Phase | Status | Date |
+|-------|--------|------|
+| 6. npm Packaging | **DONE** | 2026-03-27 |
+| 1. Structured Logging | **DONE** | 2026-03-27 |
+| 8. CI/CD Pipeline | **DONE** | 2026-03-27 |
+| 2. Upstream Health Check | **DONE** | 2026-03-27 |
+| 4. Graceful Shutdown | **DONE** | 2026-03-27 |
+| 3. Cache Invalidation | **DONE** | 2026-03-27 |
+| 5. Input Validation | **DONE** | 2026-03-27 |
+| 7. Project Structure | **PARTIAL** | 2026-03-27 — CHANGELOG.md added; test relocation deferred |
+| 10. Docker | **DONE** | 2026-03-27 |
+| 9. Distributed Rate Limiting | **NOT STARTED** | — P3, only needed for multi-instance |
 
-**Recommended execution order**: 6 → 8 → 1 → 2 → 4 → 3 → 5 → 7 → 10 → 9
+## Remaining Work
 
-Phase 6 (npm packaging) is the single highest-impact change — it transforms the install story from "clone repo, npm install, npm build, configure absolute path" to `npx synthesis-mcp`.
-
-## No New Required Dependencies
-
-Phases 1-8 use Node.js built-ins + `shx` (devDep). Phase 9 optionally adds `redis` (peer). Phase 10 adds Docker (no npm deps).
+- **Phase 7 (partial)**: Move tests from `scripts/` to `tests/unit/`, `tests/integration/`. Add e2e test using MCP SDK Client. Low priority — tests work fine where they are.
+- **Phase 9**: Extract rate limiter to interface, add optional Redis backend. Only needed for multi-instance HTTP deployments.
+- **npm publish**: Run `npm publish --access public` after setting up NPM_TOKEN secret in GitHub repo settings. Or push a `v1.0.0` tag to trigger the publish workflow.
+- **Repository URL**: Update `repository.url` in package.json and badge URLs in README when the actual GitHub repo URL is known.

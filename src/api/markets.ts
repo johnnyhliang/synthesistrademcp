@@ -25,7 +25,6 @@ export async function listMarkets(
   return client.get<UnifiedMarket[]>('markets', params as Record<string, string | number | boolean | undefined>);
 }
 
-// POST /api/v1/markets/sparklines
 export async function getSparklines(
   client: SynthesisClient,
   markets: string[]
@@ -33,7 +32,6 @@ export async function getSparklines(
   return client.post<Record<string, number[]>>('markets/sparklines', { markets });
 }
 
-// POST /api/v1/markets/prices — bulk, up to 5000
 export async function getMarketPrices(
   client: SynthesisClient,
   markets: string[]
@@ -41,7 +39,6 @@ export async function getMarketPrices(
   return client.post<Record<string, unknown>>('markets/prices', { markets });
 }
 
-// POST /api/v1/markets/orderbooks — bulk, up to 5000
 export async function getOrderbooks(
   client: SynthesisClient,
   markets: string[]
@@ -62,7 +59,6 @@ export interface HistoricalOrderbooksParams {
   points?: number;
 }
 
-// GET /api/v1/markets/orderbooks/historical
 export async function getHistoricalOrderbooks(
   client: SynthesisClient,
   params: HistoricalOrderbooksParams
@@ -70,7 +66,6 @@ export async function getHistoricalOrderbooks(
   return client.get<unknown[]>('markets/orderbooks/historical', params as unknown as Record<string, string | number | boolean | undefined>);
 }
 
-// GET /api/v1/markets/search/{query}
 export interface SearchParams {
   venue?: 'polymarket' | 'kalshi';
   labels?: string;
@@ -91,7 +86,6 @@ export async function searchMarkets(
   return client.get<UnifiedMarket[]>(`markets/search/${encodeURIComponent(query)}`, params as Record<string, string | number | boolean | undefined>);
 }
 
-// GET /api/v1/markets/statistics
 export async function getStatistics(
   client: SynthesisClient,
   venue?: 'polymarket' | 'kalshi',
@@ -100,7 +94,6 @@ export async function getStatistics(
   return client.get<unknown>('markets/statistics', { venue, interval });
 }
 
-// GET /api/v1/markets/related/{slug}
 export async function getRelatedMarkets(
   client: SynthesisClient,
   slug: string,
@@ -110,7 +103,6 @@ export async function getRelatedMarkets(
   return client.get<unknown>(`markets/related/${encodeURIComponent(slug)}`, { limit, offset });
 }
 
-// GET /api/v1/markets/similar
 export async function getSimilarMarkets(
   client: SynthesisClient,
   marketId: string,
@@ -119,7 +111,6 @@ export async function getSimilarMarkets(
   return client.get<unknown>('markets/similar', { market_id: marketId, venue });
 }
 
-// GET /api/v1/markets/similar-pairs
 export async function getSimilarPairs(
   client: SynthesisClient,
   sort?: string,
@@ -130,7 +121,6 @@ export async function getSimilarPairs(
   return client.get<unknown>('markets/similar-pairs', { sort, order, limit, offset });
 }
 
-// GET /api/v1/recommendations — auth required
 export async function getRecommendations(
   client: SynthesisClient,
   limit?: number,

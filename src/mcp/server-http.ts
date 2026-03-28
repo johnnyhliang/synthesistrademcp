@@ -3,14 +3,15 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { SynthesisClient } from '../api/client.js';
 import { createMcpServerWithTools } from './create-server.js';
+import { log } from '../utils/logger.js';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 const PORT = parseInt(process.env.PORT ?? '3000', 10);
-const MAX_BODY_BYTES = 1_048_576; // 1 MB
+const MAX_BODY_BYTES = 1_048_576;
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX_REQUESTS = 60;
-
-// ── Rate limiter (sliding window, per IP) ──────────────────────────────────────
+const HEALTH_CACHE_TTL_MS = 30_000;
+const startTime = Date.now();
 
 const rateBuckets = new Map<string, number[]>();
 
@@ -27,7 +28,6 @@ function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
     timestamps = [];
     rateBuckets.set(ip, timestamps);
   }
-  // Remove timestamps outside the window
   while (timestamps.length > 0 && timestamps[0] < now - RATE_WINDOW_MS) {
     timestamps.shift();
   }
@@ -39,8 +39,7 @@ function checkRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
   return { allowed: true };
 }
 
-// Clean up stale rate limit entries every 5 minutes
-setInterval(() => {
+const rateLimitCleanup = setInterval(() => {
   const now = Date.now();
   for (const [ip, timestamps] of rateBuckets) {
     while (timestamps.length > 0 && timestamps[0] < now - RATE_WINDOW_MS) {
@@ -48,9 +47,8 @@ setInterval(() => {
     }
     if (timestamps.length === 0) rateBuckets.delete(ip);
   }
-}, 300_000).unref();
-
-// ── CORS headers ───────────────────────────────────────────────────────────────
+}, 300_000);
+rateLimitCleanup.unref();
 
 function setCorsHeaders(res: ServerResponse): void {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -59,19 +57,52 @@ function setCorsHeaders(res: ServerResponse): void {
   res.setHeader('Access-Control-Max-Age', '86400');
 }
 
-// ── Body size check ────────────────────────────────────────────────────────────
-
 function checkBodySize(req: IncomingMessage): boolean {
   const contentLength = req.headers['content-length'];
   if (contentLength && parseInt(contentLength, 10) > MAX_BODY_BYTES) return false;
   return true;
 }
 
-// ── Server setup ───────────────────────────────────────────────────────────────
+let healthCache: { result: Record<string, unknown>; expires: number } | null = null;
+
+async function deepHealthCheck(): Promise<{ status: string; httpCode: number; body: Record<string, unknown> }> {
+  const now = Date.now();
+  const uptime_s = Math.floor((now - startTime) / 1000);
+
+  if (healthCache && now < healthCache.expires) {
+    return { status: healthCache.result.status as string, httpCode: healthCache.result.status === 'ok' ? 200 : 503, body: healthCache.result };
+  }
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch('https://synthesis.trade/api/v1/markets?limit=1', { signal: controller.signal });
+    clearTimeout(timer);
+
+    const result = {
+      status: res.ok ? 'ok' : 'degraded',
+      upstream: res.ok ? 'ok' : `error_${res.status}`,
+      tools: 38,
+      uptime_s,
+      timestamp: new Date().toISOString(),
+    };
+    healthCache = { result, expires: now + HEALTH_CACHE_TTL_MS };
+    return { status: result.status, httpCode: res.ok ? 200 : 503, body: result };
+  } catch {
+    const result = {
+      status: 'degraded',
+      upstream: 'unreachable',
+      tools: 38,
+      uptime_s,
+      timestamp: new Date().toISOString(),
+    };
+    healthCache = { result, expires: now + HEALTH_CACHE_TTL_MS };
+    return { status: 'degraded', httpCode: 503, body: result };
+  }
+}
 
 const app = createMcpExpressApp({ host: '0.0.0.0' });
 
-// CORS preflight handlers
 function handlePreflight(_req: unknown, res: ServerResponse) {
   setCorsHeaders(res);
   res.writeHead(204);
@@ -80,20 +111,29 @@ function handlePreflight(_req: unknown, res: ServerResponse) {
 app.options('/mcp', handlePreflight);
 app.options('/health', handlePreflight);
 
-// Health endpoint
-app.get('/health', (_req: unknown, res: ServerResponse & { json: (body: unknown) => void }) => {
+app.get('/health', async (req: IncomingMessage & { query?: Record<string, string> }, res: ServerResponse & { json: (body: unknown) => void }) => {
   setCorsHeaders(res);
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  const url = new URL(req.url ?? '/', `http://localhost`);
+  const shallow = url.searchParams.get('shallow') === 'true';
+
+  if (shallow) {
+    res.json({ status: 'ok', tools: 38, uptime_s: Math.floor((Date.now() - startTime) / 1000), timestamp: new Date().toISOString() });
+    return;
+  }
+
+  const check = await deepHealthCheck();
+  res.writeHead(check.httpCode, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(check.body));
 });
 
-// MCP endpoint — stateless: each POST creates a fresh server + transport
 app.post('/mcp', async (req: IncomingMessage & { body?: unknown; headers: Record<string, string | string[] | undefined> }, res: ServerResponse) => {
   setCorsHeaders(res);
-
-  // Rate limit check
+  const t0 = Date.now();
   const ip = getRateKey(req);
+
   const rateCheck = checkRateLimit(ip);
   if (!rateCheck.allowed) {
+    log.warn('rate_limited', { ip, retry_after: rateCheck.retryAfter });
     res.writeHead(429, {
       'Content-Type': 'application/json',
       'Retry-After': String(rateCheck.retryAfter),
@@ -102,29 +142,29 @@ app.post('/mcp', async (req: IncomingMessage & { body?: unknown; headers: Record
     return;
   }
 
-  // Body size check
   if (!checkBodySize(req)) {
+    log.warn('body_too_large', { ip });
     res.writeHead(413, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Request body too large (max 1MB)' }));
     return;
   }
 
   try {
-    // Pass-through auth: prefer X-User-Api-Key header, fall back to env var
     const userApiKey = req.headers['x-user-api-key'] as string | undefined;
     const client = new SynthesisClient(userApiKey ? { apiKey: userApiKey } : undefined);
     const server = createMcpServerWithTools(client);
 
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // stateless
+      sessionIdGenerator: undefined,
     });
 
     await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
     await transport.close();
     await server.close();
+    log.info('mcp_request', { ip, duration_ms: Date.now() - t0 });
   } catch (err) {
-    process.stderr.write(`[synthesis-http] Error handling POST /mcp: ${err}\n`);
+    log.error('mcp_error', { ip, error: String(err), duration_ms: Date.now() - t0 });
     if (!res.headersSent) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Internal server error' }));
@@ -132,7 +172,6 @@ app.post('/mcp', async (req: IncomingMessage & { body?: unknown; headers: Record
   }
 });
 
-// Reject GET and DELETE on /mcp (stateless mode — no SSE streams)
 app.get('/mcp', (_req: unknown, res: ServerResponse) => {
   setCorsHeaders(res);
   res.writeHead(405, { 'Content-Type': 'application/json' });
@@ -146,18 +185,32 @@ app.delete('/mcp', (_req: unknown, res: ServerResponse) => {
 });
 
 const httpServer = app.listen(PORT, '0.0.0.0', () => {
-  process.stderr.write(`[synthesis-http] MCP HTTP server listening on http://0.0.0.0:${PORT}\n`);
-  process.stderr.write(`[synthesis-http] POST /mcp — MCP endpoint\n`);
-  process.stderr.write(`[synthesis-http] GET /health — Health check\n`);
-  process.stderr.write(`[synthesis-http] Rate limit: ${RATE_MAX_REQUESTS} req/min per IP\n`);
-  process.stderr.write(`[synthesis-http] Max body: ${MAX_BODY_BYTES / 1024}KB\n`);
+  log.info('server_start', {
+    transport: 'http',
+    port: PORT,
+    rate_limit: `${RATE_MAX_REQUESTS} req/min`,
+    max_body_kb: MAX_BODY_BYTES / 1024,
+  });
 });
 
-function shutdown() {
-  process.stderr.write('[synthesis-http] Shutting down...\n');
-  httpServer.close(() => process.exit(0));
-  setTimeout(() => process.exit(1), 5000);
+let shuttingDown = false;
+
+function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  log.info('shutdown_start', { signal });
+  clearInterval(rateLimitCleanup);
+
+  httpServer.close(() => {
+    log.info('shutdown_complete', { signal });
+    process.exit(0);
+  });
+
+  setTimeout(() => {
+    log.warn('shutdown_forced', { signal, reason: 'drain timeout 10s' });
+    process.exit(1);
+  }, 10_000).unref();
 }
 
-process.on('SIGINT', shutdown);
-process.on('SIGTERM', shutdown);
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

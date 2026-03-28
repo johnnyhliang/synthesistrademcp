@@ -1,7 +1,3 @@
-/**
- * Tier 2 — Auth-required tools (SYNTHESIS_API_KEY).
- * Wallets, account management, personalized recommendations.
- */
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { SynthesisClient } from '../../api/client.js';
@@ -11,8 +7,6 @@ import { getSession, getApiKeys, getInterests, updateInterests } from '../../api
 import { summarize } from '../../utils/trim.js';
 
 export function registerTier2Tools(server: McpServer, client: SynthesisClient): void {
-
-  // ── Personalized recommendations ─────────────────────────────────────────────
 
   server.tool('get_recommendations',
     'Get personalized market recommendations based on account interests. Requires SYNTHESIS_API_KEY.',
@@ -25,8 +19,6 @@ export function registerTier2Tools(server: McpServer, client: SynthesisClient): 
       return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
-
-  // ── Account ───────────────────────────────────────────────────────────────────
 
   server.tool('get_account_session',
     'Verify current authentication status. Requires SYNTHESIS_API_KEY.',
@@ -65,8 +57,6 @@ export function registerTier2Tools(server: McpServer, client: SynthesisClient): 
       return { content: [{ type: 'text', text: summarize(data) }] };
     }
   );
-
-  // ── Wallets ───────────────────────────────────────────────────────────────────
 
   server.tool('get_wallets',
     'Get wallets for the authenticated account (auto-creates first wallet if none exist). Requires SYNTHESIS_API_KEY.',

@@ -1,4 +1,5 @@
 import type { ApiResponse, AuthMode, ClientConfig } from '../types/index.js';
+import { log } from '../utils/logger.js';
 
 const DEFAULT_BASE_URL = 'https://synthesis.trade/api/v1';
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -15,8 +16,8 @@ interface CacheEntry {
 export class SynthesisClient {
   private baseUrl: string;
   private authMode: AuthMode;
-  private apiKey?: string;       // Bearer token (account key or session token)
-  private projectApiKey?: string; // X-PROJECT-API-KEY
+  private apiKey?: string;
+  private projectApiKey?: string;
   private cache = new Map<string, CacheEntry>();
 
   constructor(config: ClientConfig = {}) {
@@ -60,7 +61,6 @@ export class SynthesisClient {
 
     switch (this.authMode) {
       case 'account':
-        // Long-lived personal key: Authorization: Bearer + X-API-KEY
         if (this.apiKey) {
           headers['Authorization'] = `Bearer ${this.apiKey}`;
           headers['X-API-KEY'] = this.apiKey;
@@ -68,14 +68,12 @@ export class SynthesisClient {
         break;
 
       case 'project':
-        // Server/backend acting as a project
         if (this.projectApiKey) {
           headers['X-PROJECT-API-KEY'] = this.projectApiKey;
         }
         break;
 
       case 'session':
-        // Short-lived session token from a project
         if (this.apiKey) {
           headers['Authorization'] = `Bearer ${this.apiKey}`;
         }
@@ -87,6 +85,9 @@ export class SynthesisClient {
 
   private async fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
     let lastError: Error | undefined;
+    const method = init.method ?? 'GET';
+    const path = url.replace(this.baseUrl, '');
+    const t0 = Date.now();
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -95,14 +96,17 @@ export class SynthesisClient {
         if (res.status === 429 || res.status >= 500) {
           lastError = new SynthesisError(res.status, url, (await res.text().catch(() => '')).slice(0, 200));
           if (attempt < MAX_RETRIES) {
+            log.warn('upstream_retry', { method, path, status: res.status, attempt });
             await new Promise(r => setTimeout(r, Math.min(1000 * 2 ** attempt, 8000)));
             continue;
           }
         }
+        log.debug('upstream_ok', { method, path, status: res.status, duration_ms: Date.now() - t0 });
         return res;
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
         if (attempt < MAX_RETRIES) {
+          log.warn('upstream_retry', { method, path, error: lastError.message, attempt });
           await new Promise(r => setTimeout(r, Math.min(1000 * 2 ** attempt, 8000)));
           continue;
         }
@@ -110,10 +114,10 @@ export class SynthesisClient {
         clearTimeout(timer);
       }
     }
+    log.error('upstream_failed', { method, path, duration_ms: Date.now() - t0, error: lastError?.message });
     throw lastError ?? new Error('Request failed after retries');
   }
 
-  /** Build a cache key that includes auth context to prevent cross-user leaks in multi-user HTTP mode. */
   private cacheKey(url: string): string {
     const key = this.apiKey ?? this.projectApiKey ?? '';
     const keySlice = key.length >= 8 ? key.slice(-8) : key;
@@ -132,11 +136,9 @@ export class SynthesisClient {
 
   private setCache(key: string, data: unknown): void {
     const now = Date.now();
-    // Sweep expired entries on every insert
     for (const [k, v] of this.cache) {
       if (now > v.expires) this.cache.delete(k);
     }
-    // If still at capacity, evict oldest by insertedAt
     if (this.cache.size >= MAX_CACHE_ENTRIES) {
       let oldestKey: string | undefined;
       let oldestTime = Infinity;
@@ -185,6 +187,12 @@ export class SynthesisClient {
     return json.response;
   }
 
+  private invalidateCache(pathPrefix: string): void {
+    for (const key of this.cache.keys()) {
+      if (key.includes(pathPrefix)) this.cache.delete(key);
+    }
+  }
+
   private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
     const res = await this.fetchWithRetry(`${this.baseUrl}/${path}`, {
       method,
@@ -201,6 +209,9 @@ export class SynthesisClient {
     if (!json.success) {
       throw new SynthesisError(200, path, 'API returned success: false');
     }
+
+    const basePath = path.split('?')[0].split('/')[0];
+    if (basePath) this.invalidateCache(basePath);
 
     return json.response;
   }
