@@ -22,6 +22,24 @@ cd mcp-server-synthesis && npm install && npm run build
 node dist/mcp/server.js
 ```
 
+Local dev without publishing:
+
+```bash
+git clone https://github.com/liang/mcp-server-synthesis
+cd mcp-server-synthesis && npm install && npm run build
+npm link                  # registers the bin globally on your machine
+mcp-server-synthesis      # now works like a global install
+```
+
+Or skip the link and just point Claude at the built file directly:
+
+```bash
+# Claude Code
+claude mcp add synthesis -- node /absolute/path/to/mcp-server-synthesis/dist/mcp/server.js
+
+# Claude Desktop -- use "node" as command, path as first arg
+```
+
 Docker:
 
 ```bash
@@ -210,3 +228,30 @@ Releasing:
 ```bash
 npm version patch && git push --follow-tags   # CI publishes to npm
 ```
+
+## Technical overview
+
+For reviewers or anyone picking this up.
+
+**Package**: `mcp-server-synthesis` v1.0.0, ~1,925 lines TypeScript across 17 files. Published size is 62.9 kB / 20 files (only `dist/`, README, LICENSE, package.json). Two runtime deps: `@modelcontextprotocol/sdk` and `zod`.
+
+**What it does**: Wraps the synthesis.trade REST API as an MCP server. 38 tools across Polymarket + Kalshi market data, news, account management, and wallets. Stdio transport for Claude Code/Desktop, HTTP transport for multi-user deployments. Users supply their own API key.
+
+**Performance**: All tools are passthrough to synthesis.trade -- latency is upstream latency plus a few ms of overhead. GET responses are cached 60s in memory with a 1000-entry cap and auth-aware keys. Response trimming strips ~93% of token weight before it hits the LLM. HTTP mode creates a fresh MCP server per request, which is negligible overhead for moderate traffic but wouldn't scale to thousands of concurrent users without a connection pool or session reuse.
+
+**Security**:
+- No secrets in logs -- logger never touches apiKey values
+- Cache keys include auth fingerprint so users can't see each other's data
+- All params go through zod validation then into `URLSearchParams` -- no injection risk
+- All URLs built from hardcoded base URL -- no SSRF
+- `export_wallet` exposes encrypted key material through the LLM, which is a risk if conversation logs are stored. May want an env gate like trading has.
+- `delete_wallet` has no confirmation mechanism unlike trading tools
+- HTTP binds 0.0.0.0 without host validation -- needs a reverse proxy in production
+
+**Cache eviction**: The cache uses an O(n) scan to find the oldest entry when at capacity. This is fine at 1000 entries (sub-millisecond), but if the cap were ever raised significantly you'd want a proper LRU structure (doubly-linked list + map for O(1) evict). Same concept as CPU cache eviction but in application memory and much less performance-sensitive.
+
+**Rate limiter**: In-memory sliding window per IP using timestamp arrays. `shift()` on arrays is O(n) per call -- fine at 60 entries per window, but a reviewer would flag it. Resets on restart. Doesn't work across multiple instances; would need Redis (Phase 9, not implemented) for that.
+
+**What's not wired up**: 10 upstream endpoints return 404 or 400 -- batch POST (prices, orderbooks, sparklines), polygon reads (balances, orders, swaps), and trading (place, cancel, swap, withdraw). The API functions exist in `src/api/` but the tools aren't registered. Trading has a 6-layer safety system ready for when the endpoints come online.
+
+**Files to look at first**: `src/api/client.ts` (HTTP client, caching, auth, retry), `src/mcp/server-http.ts` (HTTP server, rate limiting, health check, shutdown), `src/utils/trim.ts` (response trimming pipeline)

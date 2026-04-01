@@ -4,3 +4,5 @@ dist/
 api-manifest.json
 *.env
 .env.*
+.claude/
+PLAN.md
